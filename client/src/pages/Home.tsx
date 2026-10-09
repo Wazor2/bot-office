@@ -362,6 +362,7 @@ export default function Home() {
           </div>
         </header>
 
+        {workspaceQuery.isError && <div className="workspace-error-banner" role="alert"><Database size={14} /><span>Your saved workspace did not load.</span><button type="button" onClick={() => void workspaceQuery.refetch()}>Retry</button></div>}
         <div className="preview-banner"><span className="preview-banner-dot" /><span><strong>Preview build</strong> · Text briefs save privately on send; provider calls and file uploads are not connected yet.</span><button type="button" onClick={() => setSettingsOpen(true)}>Set up providers <ArrowRight size={13} /></button></div>
 
         <section className={`conversation-scroll${savedMessages.length > 0 ? " showing-conversation" : ""}`} aria-label="Project conversation">
@@ -401,7 +402,7 @@ export default function Home() {
                 <span className="suggestion-icon amber"><Code2 size={16} /></span><span><strong>Build from a brief</strong><small>Delegate implementation, tests and review</small></span><ArrowUp size={15} className="suggestion-arrow" />
               </button>
             </div>
-            <div className="honesty-note"><LockKeyhole size={13} /><span>This is the first UI increment. Real AI calls, persistence, and uploads are not wired up yet.</span></div>
+            <div className="honesty-note"><LockKeyhole size={13} /><span>This is the first UI increment. Provider calls, secure credential setup, and file uploads are not wired up yet.</span></div>
           </div>
         </section>
 
@@ -433,17 +434,17 @@ export default function Home() {
       </main>
 
       {activityVisible && <aside className="activity-panel" aria-label="Run activity and progress">
-        <div className="activity-header"><div><span className="eyebrow">LIVE WORKSPACE</span><h2>Run activity</h2></div><button type="button" className="icon-button activity-menu" aria-label="Activity options"><MoreHorizontal size={18} /></button></div>
+        <div className="activity-header"><div><span className="eyebrow">RUN STATUS · PREVIEW</span><h2>Run activity</h2></div><button type="button" className="icon-button activity-menu" aria-label="Activity options"><MoreHorizontal size={18} /></button></div>
         <div className="run-state-card">
           <div className="run-state-top"><div className="run-state-icon"><Activity size={17} /></div><span className="idle-pill"><span /> IDLE</span></div>
-          <strong>Waiting for your first brief</strong>
-          <p>Your Supervisor will create a task plan before workers begin.</p>
+          <strong>{activeProject ? "Brief saved · no run started" : "Waiting for your first brief"}</strong>
+          <p>{activeProject ? "Provider execution is not connected. No AI task has been created." : "The Supervisor will create a task plan once provider execution is connected."}</p>
           <div className="run-progress-label"><span>Project progress</span><span>0%</span></div>
           <div className="progress-track"><span style={{ width: "0%" }} /></div>
           <div className="run-progress-foot"><span>0 tasks</span><span>·</span><span>0 completed</span></div>
         </div>
 
-        <div className="activity-section-head"><span className="eyebrow">SUPERVISOR LOOP</span><span className="loop-live"><span /> READY</span></div>
+        <div className="activity-section-head"><span className="eyebrow">SUPERVISOR LOOP</span><span className="loop-live"><span /> FLOW PREVIEW</span></div>
         <div className="timeline-list">
           <div className="timeline-item current"><div className="timeline-marker"><span>1</span></div><div><strong>Understand the brief</strong><small>Clarify intent if essential</small></div></div>
           <div className="timeline-stem" />
@@ -458,7 +459,7 @@ export default function Home() {
         <div className="activity-section-head"><span className="eyebrow">TEAM READINESS</span><button type="button" className="text-action" onClick={() => setSettingsOpen(true)}>Manage <ArrowRight size={12} /></button></div>
         <div className="readiness-row"><span className="readiness-icon"><KeyRound size={15} /></span><span><strong>Provider connections</strong><small>Configure an official API or CLI</small></span><span className="readiness-count">0 / {roles.length}</span></div>
         <div className="readiness-row"><span className="readiness-icon"><Layers3 size={15} /></span><span><strong>Worker sandbox</strong><small>Isolated execution not set up yet</small></span><span className="readiness-label">Later</span></div>
-        <div className="readiness-row"><span className="readiness-icon"><Database size={15} /></span><span><strong>Persistent history</strong><small>Database integration not wired yet</small></span><span className="readiness-label">Later</span></div>
+        <div className="readiness-row"><span className="readiness-icon"><Database size={15} /></span><span><strong>Project history</strong><small>Text briefs save to your workspace</small></span><span className="readiness-label">On</span></div>
 
         <div className="activity-spacer" />
         <div className="free-tier-note"><div className="free-tier-icon"><Zap size={14} /></div><div><strong>Free-first, not quota bypass</strong><p>Cloud providers set their own limits. Optional Ollama can be a local fallback.</p><button type="button" onClick={() => setSettingsOpen(true)}>Provider options <ArrowRight size={12} /></button></div></div>
