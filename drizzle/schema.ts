@@ -1,17 +1,8 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { index, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
-/**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
- */
+/** Core user table backing the supplied Manus OAuth flow. */
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
@@ -25,4 +16,55 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+/** Private, owner-scoped project records. */
+export const projects = mysqlTable(
+  "projects",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 120 }).notNull(),
+    description: text("description"),
+    status: mysqlEnum("status", [
+      "draft", "planning", "ready", "running", "paused", "awaiting_approval", "failed", "completed", "cancelled", "archived",
+    ]).default("draft").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => ({ ownerUpdatedIdx: index("projects_owner_updated_idx").on(table.userId, table.updatedAt) }),
+);
+
+export type Project = typeof projects.$inferSelect;
+
+/** One or more conversations can belong to a project. */
+export const conversations = mysqlTable(
+  "conversations",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    projectId: int("projectId").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 160 }).notNull(),
+    status: mysqlEnum("status", ["open", "archived"]).default("open").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => ({ ownerProjectIdx: index("conversations_owner_project_idx").on(table.userId, table.projectId) }),
+);
+
+export type Conversation = typeof conversations.$inferSelect;
+
+/** Conversation messages are persisted as content, not as executed AI actions. */
+export const messages = mysqlTable(
+  "messages",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    projectId: int("projectId").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    conversationId: int("conversationId").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    role: mysqlEnum("role", ["user", "supervisor", "worker", "system"]).notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({ conversationCreatedIdx: index("messages_conversation_created_idx").on(table.conversationId, table.createdAt) }),
+);
+
+export type Message = typeof messages.$inferSelect;

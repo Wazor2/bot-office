@@ -1,0 +1,41 @@
+# Bot Office — delivery outcomes
+
+These are the approved product outcomes from the project brief and plan. Work incrementally; an item remains open until its behavior is implemented and supported by evidence.
+
+## 1. Project workspace, chat and materials
+
+The user can create, view, edit, archive, delete and run projects. The user can connect a local repository or a supported remote Git repository. A project brief accepts natural-language details, technology preferences, constraints and acceptance criteria. The application works as a normal project chatbot: the user types orders and adds project material/files; the Supervisor receives that prompt and material. Project and conversation data can be resumed; the UI distinguishes empty, loading, active, paused, waiting-for-user, failed and completed states.
+
+## 2. Supervisor planning, roles and task graph
+
+The Supervisor can understand requirements, ask essential clarification questions, create milestones, tasks, dependencies, priorities, risks and acceptance criteria, assign work to suitable agents, monitor workers, review output/evidence, request corrections, approve/reject work, enforce security/testing/budget/permission policies and produce a final report. The user can create, edit, enable, disable and delete custom roles. Built-in role coverage includes Frontend, Backend, Database, QA, Security, Documentation and DevOps. Every worker receives project ID, task ID, role, instructions, relevant files, acceptance criteria, allowed tools and commands, budget, time limit, required tests and security restrictions; it works only on its assigned task, reads project instructions, avoids unrelated files and secrets, and returns structured results.
+
+Project states are draft, planning, ready, running, paused, awaiting_approval, failed, completed, cancelled and archived. Task states are pending, blocked, assigned, running, awaiting_review, correction_required, approved, rejected, failed and cancelled. Provider states are healthy, degraded, rate_limited, quota_exhausted, authentication_failed, unavailable and disabled.
+
+## 3. Provider and model management
+
+The user can add, edit, test, enable, disable, remove and reorder providers and models, choose models and capabilities, and assign available AIs to roles from the sidebar/settings. Support both official provider APIs and officially supported coding-agent CLIs/adapters behind a common provider interface: health_check(), list_models(), get_capabilities(model), generate(request), stream(request), estimate_usage(request), classify_error(error) and get_usage(). Capability metadata may include tool calling, structured output, code editing, vision, long context, reasoning, streaming, local execution and parallel requests. Cloud providers are the primary workers; Ollama is an optional secondary/local fallback. Never automate or bypass the ChatGPT, Claude or Gemini desktop applications, provider terms or quotas.
+
+## 4. Worker execution, isolation and quality evidence
+
+Parallel coding workers use isolated Git worktrees or sandboxes. Workers can inspect files, edit permitted files, run permitted commands/tests and create commits. The Supervisor never trusts a worker’s completion claim alone: completion evidence includes changed files, a commit or patch, commands executed, test results, acceptance-criteria review and known issues. The system can run configured unit, integration, end-to-end, lint, formatting, type, dependency and security checks. The server must not execute arbitrary chat-supplied commands directly. Approval is required before destructive operations, secret access, protected-branch changes, production changes, deployment, unrestricted network access or dangerous commands.
+
+## 5. Closed-loop communication, review and correction
+
+Workers send progress, questions, doubts, blockers, proposed changes, results and evidence back to the Supervisor. The Supervisor handles technical questions, reviews results, requests corrections, retries failed tasks, reassigns work when needed, and approves or rejects work. When a decision depends on the user’s intent or a basic preference, the Supervisor asks the user in chat; dependent work waits and resumes after the user replies. The Supervisor requests corrections with the defect, evidence, expected fix and acceptance criteria. Do not report completion without evidence.
+
+## 6. Routing, failover, recovery and budgets
+
+Provider routing considers role, capabilities, priority, health, budget, privacy and availability. On rate limits, quota exhaustion, timeouts, outages or temporary errors, apply bounded retries, preserve complete task context, record why failover happened, try another compatible model/provider and use Ollama only if enabled. Do not retry indefinitely or retry invalid credentials/requests without changing them. Health-check failed providers and restore preferred routing after recovery under configurable policy, without interrupting a running task unless migration is explicitly enabled. If no provider is usable, pause the task and notify the user. Enforce per-provider, per-role, per-project, per-task and per-run limits for tokens, time, requests and estimated cost. Prefer eligible free tiers and clearly expose usage/limits; do not claim unlimited cloud AI is free or bypass quotas.
+
+## 7. Live dashboard and run controls
+
+The dashboard shows projects, milestones, tasks, agents, current activity, logs, tests, failures, approvals, provider health/failovers, budgets/usage and final reports in near real time. The user can start, pause, resume, retry, cancel, terminate, approve, reject, reassign and merge work. The app visibly tracks current work and overall progress; provider status and user questions are not hidden.
+
+## 8. Credential safety, privacy and audit
+
+Provider credentials stay server-side, are never exposed in browser code, plaintext database fields, source, Git, logs, screenshots or reports, and are masked in the interface. Provider settings and access boundaries must be designed before collecting credentials. Project and user work is auditable and resumable. Record user commands, prompts, responses, tool calls, commands, files changed, tests, failures, approvals, merges and provider changes. Treat worker output, project files and external content as untrusted input. Keep the initial preview unpublished; implement and verify application authentication/authorization before any public release.
+
+## 9. Final report and self-hosting
+
+The final report contains a summary, changed files, tests, warnings, unresolved issues, provider usage/failovers and setup instructions. The eventual project is self-hostable, with Docker Compose first, readable modular code and small reliable dependencies. Keep the long-term repository structure and documentation requested in the brief: AGENTS.md, GEMINI.md, README, LICENSE, .env.example, docker-compose.yml; docs for project charter, MRD, BRD, PRD, FRD, SRS, stakeholder/system requirements, architecture, threat model, data model, API, UI/UX, agent contracts, provider adapters, test strategy, deployment/operations, disaster recovery, traceability and release plan; .agents/ task, implementation plan, decisions, walkthrough and knowledge; apps/api, dashboard and worker; packages/domain, providers, orchestration, sandbox and observability; tests, scripts and infra. Update docs as implementation changes. Evaluate mature open-source components before replacing them; candidates named in the brief include OpenHands/SDK, LangGraph, CrewAI, AutoGen, LiteLLM, Ollama, OpenCode, Aider, Goose, SWE-agent, supported coding CLIs, LibreChat, Dify/n8n, Docker, Daytona/E2B, Langfuse/Phoenix and GitHub MCP. Use only what is justified.

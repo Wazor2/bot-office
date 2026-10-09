@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Bot Office relay mark">
+  <rect width="256" height="256" rx="62" fill="#d5f274"/>
+  <path d="M128 99 86 167M128 99l42 68" fill="none" stroke="#20352a" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="128" cy="82" r="24" fill="#e8f6b6" stroke="#20352a" stroke-width="13"/>
+  <circle cx="75" cy="177" r="24" fill="#e8f6b6" stroke="#20352a" stroke-width="13"/>
+  <circle cx="181" cy="177" r="24" fill="#e8f6b6" stroke="#20352a" stroke-width="13"/>
+</svg>
