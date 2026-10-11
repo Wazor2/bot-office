@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 
 type ProviderKind = "Official API" | "Official CLI" | "Local model";
+type ApiProviderId = "anthropic-api" | "openai-api" | "google-api" | "openrouter-api";
 
 type Provider = {
   id: string;
@@ -109,23 +110,73 @@ function ProviderMark({ provider, small = false }: { provider: Provider; small?:
 
 function ProviderSettings({
   providers,
+  credentials,
+  vaultReady,
+  vaultLoading,
+  vaultError,
   onAdd,
   onRemove,
+  onSaveCredential,
+  onRemoveCredential,
   onClose,
 }: {
   providers: Provider[];
+  credentials: { providerId: string; keyLastFour: string }[];
+  vaultReady: boolean;
+  vaultLoading: boolean;
+  vaultError?: string;
   onAdd: (provider: Provider) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string) => Promise<void>;
+  onSaveCredential: (providerId: string, apiKey: string) => Promise<void>;
+  onRemoveCredential: (providerId: string) => Promise<void>;
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<"all" | "api" | "cli">("all");
+  const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({});
+  const [savingProvider, setSavingProvider] = useState<string | null>(null);
+  const [localError, setLocalError] = useState("");
   const existingIds = new Set(providers.map((provider) => provider.id));
+  const credentialByProvider = new Map(credentials.map((credential) => [credential.providerId, credential]));
   const available = providerCatalog.filter((provider) => !existingIds.has(provider.id));
   const visible = available.filter((provider) => {
     if (tab === "api") return provider.kind === "Official API";
     if (tab === "cli") return provider.kind === "Official CLI";
     return true;
   });
+  const saveKey = async (providerId: string) => {
+    const apiKey = keyDrafts[providerId] ?? "";
+    if (!apiKey.trim() || !vaultReady || savingProvider) return;
+    setSavingProvider(providerId);
+    setLocalError("");
+    try {
+      await onSaveCredential(providerId, apiKey);
+      setKeyDrafts((current) => ({ ...current, [providerId]: "" }));
+    } catch (error) {
+      setLocalError("Could not save this key securely. Check that it is valid text and try again.");
+    } finally {
+      setSavingProvider(null);
+    }
+  };
+  const removeKey = async (providerId: string) => {
+    if (savingProvider) return;
+    setSavingProvider(providerId);
+    setLocalError("");
+    try {
+      await onRemoveCredential(providerId);
+    } catch (error) {
+      setLocalError("Could not remove the saved key. Please try again.");
+    } finally {
+      setSavingProvider(null);
+    }
+  };
+  const removeProviderDraft = async (providerId: string) => {
+    setLocalError("");
+    try {
+      await onRemove(providerId);
+    } catch {
+      setLocalError("Could not remove this provider. Please try again.");
+    }
+  };
 
   return (
     <div className="modal-scrim" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -142,27 +193,58 @@ function ProviderSettings({
         </div>
         <div className="secure-note">
           <LockKeyhole size={16} />
-          <p><strong>Connection setup comes next.</strong> Draft providers and roles stay in this browser; no API keys are stored, provider requests are sent, or local CLIs run.</p>
+          <p><strong>Keys are account-scoped and encrypted before database storage.</strong> A saved key is shown only as its last four characters. Saving does not test the key or start AI calls.</p>
         </div>
+        {!vaultReady && <div className="vault-status-note">{vaultLoading ? "Checking secure vault…" : "Secure key storage is not configured yet. Provider keys cannot be saved until the app vault is enabled."}</div>}
+        {(vaultError || localError) && <div className="credential-error" role="alert">{localError || vaultError}</div>}
         <div className="provider-modal-section">
-          <div className="section-heading"><span>Example team connections</span><span className="count-pill">{providers.length} drafted</span></div>
+          <div className="section-heading"><span>Provider connections</span><span className="count-pill">{providers.length} configured</span></div>
           <div className="provider-list">
             {providers.length === 0 ? (
-              <div className="empty-providers">No providers added. Choose one below to draft a team connection.</div>
+              <div className="empty-providers">No providers added. Choose a cloud API below to configure a key.</div>
             ) : providers.map((provider) => (
+              (() => {
+                const credential = credentialByProvider.get(provider.id);
+                const isCloudApi = provider.kind === "Official API";
+                return (
               <div className="provider-card" key={provider.id}>
                 <ProviderMark provider={provider} />
                 <div className="provider-card-info">
-                  <div className="provider-card-name">{provider.name}<span className="not-connected-pill">Not connected</span></div>
+                  <div className="provider-card-name">{provider.name}<span className={credential ? "key-saved-pill" : "not-connected-pill"}>{credential ? "Key saved" : "Not connected"}</span></div>
                   <div className="provider-card-subtitle">{provider.family} <span>·</span> {provider.kind}</div>
                 </div>
-                <button className="remove-provider" type="button" onClick={() => onRemove(provider.id)} aria-label={`Remove ${provider.name} draft`} title="Remove draft"><Trash2 size={15} /></button>
+                <button className="remove-provider" type="button" onClick={() => void removeProviderDraft(provider.id)} aria-label={`Remove ${provider.name}`} title="Remove provider"><Trash2 size={15} /></button>
+                {isCloudApi ? <div className="provider-key-row">
+                  <form className="provider-key-form" onSubmit={(event) => { event.preventDefault(); void saveKey(provider.id); }}>
+                    <label className="sr-only" htmlFor={`api-key-${provider.id}`}>{provider.name} API key</label>
+                    <input
+                      id={`api-key-${provider.id}`}
+                      type="password"
+                      value={keyDrafts[provider.id] ?? ""}
+                      onChange={(event) => setKeyDrafts((current) => ({ ...current, [provider.id]: event.target.value }))}
+                      placeholder={credential ? "Enter a replacement API key" : `Paste ${provider.name} API key`}
+                      autoComplete="new-password"
+                      spellCheck={false}
+                      maxLength={16_384}
+                      aria-label={`${provider.name} API key`}
+                    />
+                    <button type="submit" disabled={!vaultReady || !keyDrafts[provider.id]?.trim() || savingProvider !== null}>
+                      {savingProvider === provider.id ? "Saving…" : credential ? "Replace key" : "Save key"}
+                    </button>
+                  </form>
+                  <div className="provider-key-meta">
+                    <span>{credential ? `Saved ····${credential.keyLastFour} · not tested` : "No key saved"}</span>
+                    {credential && <button type="button" disabled={savingProvider !== null} onClick={() => void removeKey(provider.id)}>Remove key</button>}
+                  </div>
+                </div> : <div className="provider-key-row cli-key-note">{provider.kind === "Official CLI" ? "CLI setup requires the trusted worker runner." : "Local model setup is not connected yet."}</div>}
               </div>
+                );
+              })()
             ))}
           </div>
         </div>
         <div className="provider-modal-section catalog-section">
-          <div className="section-heading"><span>Add a provider</span><span className="muted-count">No key required for this preview</span></div>
+          <div className="section-heading"><span>Add a provider</span><span className="muted-count">API keys are entered above</span></div>
           <div className="catalog-tabs" role="tablist" aria-label="Provider types">
             {(["all", "api", "cli"] as const).map((value) => (
               <button key={value} type="button" role="tab" aria-selected={tab === value} className={`catalog-tab${tab === value ? " selected" : ""}`} onClick={() => setTab(value)}>
@@ -179,7 +261,7 @@ function ProviderSettings({
               </button>
             ))}
           </div>
-          <p className="modal-footnote">Ollama is an optional local fallback. Cloud provider use depends on your own account, credentials and available quota. Desktop-app automation is not supported.</p>
+          <p className="modal-footnote">Supported cloud APIs: Anthropic, OpenAI, Google Gemini and OpenRouter. Keys are encrypted at rest and never stored in browser storage. Provider requests, model selection and CLI execution are still future work. Cloud use follows your provider’s own quota and pricing; desktop-app automation is not supported.</p>
         </div>
       </section>
     </div>
@@ -206,6 +288,13 @@ export default function Home() {
   const [newProjectMode, setNewProjectMode] = useState(false);
   const workspaceQuery = trpc.workspace.current.useQuery(undefined, { refetchOnWindowFocus: false });
   const trpcUtils = trpc.useUtils();
+  const providerCredentialsQuery = trpc.providerCredentials.list.useQuery(undefined, { refetchOnWindowFocus: false });
+  const saveProviderCredential = trpc.providerCredentials.save.useMutation({
+    onSuccess: () => trpcUtils.providerCredentials.list.invalidate(),
+  });
+  const removeProviderCredential = trpc.providerCredentials.remove.useMutation({
+    onSuccess: () => trpcUtils.providerCredentials.list.invalidate(),
+  });
   const createWithBrief = trpc.workspace.createWithBrief.useMutation({
     onSuccess: async () => {
       setDraft("");
@@ -231,13 +320,26 @@ export default function Home() {
   const providersById = useMemo(() => new Map(providers.map((provider) => [provider.id, provider])), [providers]);
   const addProvider = (provider: Provider) => {
     setProviders((current) => current.some((item) => item.id === provider.id) ? current : [...current, provider]);
-    setNotice(`${provider.name} added as a draft. Secure connection setup is not available in this preview yet.`);
+    setNotice(`${provider.name} added. Enter its API key in the provider list above to save it securely.`);
   };
-  const removeProvider = (id: string) => {
+  const removeProvider = async (id: string) => {
     const removed = providersById.get(id);
+    if (providerCredentialsQuery.data?.credentials.some((credential) => credential.providerId === id)) {
+      await removeProviderCredential.mutateAsync({ providerId: id as ApiProviderId });
+    }
     setProviders((current) => current.filter((provider) => provider.id !== id));
     setRoles((current) => current.map((role) => role.providerId === id ? { ...role, providerId: "" } : role));
-    if (removed) setNotice(`${removed.name} draft removed. No provider credentials were stored.`);
+    if (removed) setNotice(`${removed.name} removed, including any saved key for your account.`);
+  };
+  const saveProviderKey = async (providerId: string, apiKey: string) => {
+    await saveProviderCredential.mutateAsync({ providerId: providerId as ApiProviderId, apiKey });
+    const name = providersById.get(providerId)?.name ?? providerId;
+    setNotice(`${name} key saved encrypted for your account. It has not been tested or used for AI calls yet.`);
+  };
+  const deleteProviderKey = async (providerId: string) => {
+    await removeProviderCredential.mutateAsync({ providerId: providerId as ApiProviderId });
+    const name = providersById.get(providerId)?.name ?? providerId;
+    setNotice(`${name} key removed from your account.`);
   };
   const assignProvider = (roleId: string, providerId: string) => {
     setRoles((current) => current.map((role) => role.id === roleId ? { ...role, providerId } : role));
@@ -276,7 +378,7 @@ export default function Home() {
   return (
     <div className="bot-app">
       <nav className="app-rail" aria-label="Main navigation">
-        <a className="brand-mark" href="#home" aria-label="Bot Office home">
+        <a className="brand-mark" href="#home" aria-label="Bot Office home" title="Return to the workspace" onClick={() => { setSettingsOpen(false); setMobileTeamOpen(false); setActivityVisible(true); window.requestAnimationFrame(() => composerRef.current?.focus({ preventScroll: true })); }}>
           <span className="relay-logo"><i /><i /><i /></span>
         </a>
         <div className="rail-divider" />
@@ -355,7 +457,7 @@ export default function Home() {
             <span className="private-badge"><LockKeyhole size={12} /> PRIVATE</span>
           </div>
           <div className="topbar-actions">
-            <div className="connection-status"><span className="offline-indicator" /> 0 providers connected</div>
+            <div className="connection-status"><span className="offline-indicator" /> AI execution not enabled</div>
             <button type="button" className="new-project-button" onClick={() => { setNewProjectMode(true); setDraft(""); setFiles([]); setNotice(""); }}><Plus size={13} /><span>New project</span></button>
             <button type="button" className="topbar-icon" onClick={() => setActivityVisible((value) => !value)} aria-label={activityVisible ? "Hide run activity" : "Show run activity"}><Activity size={17} /></button>
             <button type="button" className="settings-button" onClick={() => setSettingsOpen(true)}><Settings2 size={15} /><span>Settings</span></button>
@@ -402,7 +504,7 @@ export default function Home() {
                 <span className="suggestion-icon amber"><Code2 size={16} /></span><span><strong>Build from a brief</strong><small>Delegate implementation, tests and review</small></span><ArrowUp size={15} className="suggestion-arrow" />
               </button>
             </div>
-            <div className="honesty-note"><LockKeyhole size={13} /><span>This is the first UI increment. Provider calls, secure credential setup, and file uploads are not wired up yet.</span></div>
+            <div className="honesty-note"><LockKeyhole size={13} /><span>Provider keys can be stored encrypted. AI calls, worker execution, and file uploads are not connected yet.</span></div>
           </div>
         </section>
 
@@ -466,7 +568,18 @@ export default function Home() {
         <div className="activity-footer"><span><span className="activity-footer-dot" /> All agents idle</span><span><Clock3 size={12} /> No run started</span></div>
       </aside>}
 
-      {settingsOpen && <ProviderSettings providers={providers} onAdd={addProvider} onRemove={removeProvider} onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <ProviderSettings
+        providers={providers}
+        credentials={providerCredentialsQuery.data?.credentials ?? []}
+        vaultReady={providerCredentialsQuery.data?.vaultReady ?? false}
+        vaultLoading={providerCredentialsQuery.isLoading}
+        vaultError={providerCredentialsQuery.isError ? "Could not load secure provider settings. Close and retry in a moment." : undefined}
+        onAdd={addProvider}
+        onRemove={removeProvider}
+        onSaveCredential={saveProviderKey}
+        onRemoveCredential={deleteProviderKey}
+        onClose={() => setSettingsOpen(false)}
+      />}
     </div>
   );
 }

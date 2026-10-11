@@ -15,6 +15,13 @@
       "when": 1791529243518,
       "tag": "0001_big_puppet_master",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1791714295082,
+      "tag": "0002_bright_talisman",
+      "breakpoints": true
     }
   ]
 }

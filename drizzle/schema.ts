@@ -1,4 +1,4 @@
-import { index, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /** Core user table backing the supplied Manus OAuth flow. */
 export const users = mysqlTable("users", {
@@ -68,3 +68,22 @@ export const messages = mysqlTable(
 );
 
 export type Message = typeof messages.$inferSelect;
+
+/** Per-user provider keys, encrypted by the application before they reach this table. */
+export const providerCredentials = mysqlTable(
+  "provider_credentials",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    providerId: varchar("providerId", { length: 64 }).notNull(),
+    encryptedKey: text("encryptedKey").notNull(),
+    keyLastFour: varchar("keyLastFour", { length: 4 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => ({
+    ownerProviderUnique: uniqueIndex("provider_credentials_owner_provider_unique").on(table.userId, table.providerId),
+  }),
+);
+
+export type ProviderCredential = typeof providerCredentials.$inferSelect;
