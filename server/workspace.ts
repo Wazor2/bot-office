@@ -16,10 +16,12 @@ async function requireDatabase() {
   return db;
 }
 
-function projectTitleFromBrief(brief: string) {
+export function projectTitleFromBrief(brief: string) {
   const firstLine = brief.split(/\r?\n/).map((line) => line.trim()).find(Boolean);
   const normalized = (firstLine ?? "New project").replace(/\s+/g, " ");
-  return normalized.length > 112 ? `${normalized.slice(0, 109)}…` : normalized;
+  // Count code points, not UTF-16 units, so emoji are never split into a lone surrogate (MySQL rejects those).
+  const chars = Array.from(normalized);
+  return chars.length > 112 ? `${chars.slice(0, 109).join("")}…` : normalized;
 }
 
 export const workspaceRouter = router({

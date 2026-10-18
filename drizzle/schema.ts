@@ -1,4 +1,4 @@
-import { index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { index, int, mysqlEnum, mysqlTable, mediumtext, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /** Core user table backing the supplied Manus OAuth flow. */
 export const users = mysqlTable("users", {
@@ -23,7 +23,7 @@ export const projects = mysqlTable(
     id: int("id").autoincrement().primaryKey(),
     userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 120 }).notNull(),
-    description: text("description"),
+    description: mediumtext("description"),
     status: mysqlEnum("status", [
       "draft", "planning", "ready", "running", "paused", "awaiting_approval", "failed", "completed", "cancelled", "archived",
     ]).default("draft").notNull(),
@@ -61,7 +61,7 @@ export const messages = mysqlTable(
     conversationId: int("conversationId").notNull().references(() => conversations.id, { onDelete: "cascade" }),
     userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
     role: mysqlEnum("role", ["user", "supervisor", "worker", "system"]).notNull(),
-    content: text("content").notNull(),
+    content: mediumtext("content").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => ({ conversationCreatedIdx: index("messages_conversation_created_idx").on(table.conversationId, table.createdAt) }),
